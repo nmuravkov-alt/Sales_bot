@@ -8,23 +8,32 @@ from google.oauth2.service_account import Credentials
 SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
 SIZES = ["XS", "S", "M", "L", "XL", "XXL"]
 
+
 def _client():
     """
     Читает GOOGLE_SERVICE_ACCOUNT_JSON (в формате base64 или JSON).
-    Автоматически декодирует и приводит ключ к корректному виду.
+    Исправляет возможные проблемы с кавычками и переводами строк.
     """
     raw = os.environ["GOOGLE_SERVICE_ACCOUNT_JSON"].strip()
 
-    # Если начинается не с "{", считаем, что это base64
+    # Если значение случайно обернули в кавычки ("{...}")
+    if raw.startswith('"') and raw.endswith('"'):
+        raw = raw[1:-1]
+
+    # Если это base64 (не начинается с '{') — декодируем
     if not raw.startswith("{"):
         raw = base64.b64decode(raw).decode("utf-8")
 
+    # Преобразуем JSON
     data = json.loads(raw)
 
     # Исправляем ключ: превращаем \\n в реальные переводы строк
     pk = data.get("private_key", "")
-    if "\\n" in pk and "\n" not in pk:
-        data["private_key"] = pk.replace("\\n", "\n")
+    data["private_key"] = pk.replace("\\n", "\n")
+
+    # Проверяем корректность ключа (для раннего выявления ошибок)
+    if not data["private_key"].startswith("-----BEGIN "):
+        raise ValueError("Ошибка в формате private_key — проверь GOOGLE_SERVICE_ACCOUNT_JSON")
 
     creds = Credentials.from_service_account_info(data, scopes=SCOPES)
     gc = gspread.authorize(creds)
@@ -158,7 +167,7 @@ def refund_sale(sku: str, size: str):
     idx_name = headers.index("Name")
 
     last = None
-    for row in reversed(records[1:]):  # skip header
+    for row in reversed(records[1:]):
         if row and row[idx_sku].strip().lower() == sku.strip().lower() and row[idx_size].upper() == size.upper():
             last = row
             break
