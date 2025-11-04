@@ -3,6 +3,7 @@ import os
 from aiogram import Bot, Dispatcher
 from aiogram.filters import Command
 from aiogram.types import Message
+from aiogram.client.default import DefaultBotProperties  # <— добавили
 
 from sheets import ensure_structure, add_stock, record_sale, refund_sale, set_default_price
 
@@ -11,8 +12,11 @@ ALLOWED_USER_IDS = {
     s.strip() for s in os.environ.get("ALLOWED_USER_IDS", "").split(",") if s.strip()
 }
 
-# Экспортируемые объекты, которые импортирует web.py
-bot = Bot(token=TELEGRAM_BOT_TOKEN, parse_mode="HTML")
+# ✅ aiogram 3.7+: parse_mode задаём через default=DefaultBotProperties
+bot = Bot(
+    token=TELEGRAM_BOT_TOKEN,
+    default=DefaultBotProperties(parse_mode="HTML")
+)
 dp = Dispatcher()
 
 def _allowed(msg: Message) -> bool:
